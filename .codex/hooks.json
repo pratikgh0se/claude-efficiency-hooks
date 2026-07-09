@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/bash-cat-block.sh\"",
+            "timeout": 30,
+            "statusMessage": "Checking shell output size"
+          }
+        ]
+      },
+      {
+        "matcher": "^(Grep|Glob|Read)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/graph-first-block.sh\"",
+            "timeout": 30,
+            "statusMessage": "Checking graph-first policy"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/context-monitor-stop.sh\"",
+            "timeout": 30,
+            "statusMessage": "Checking context size"
+          }
+        ]
+      }
+    ]
+  }
+}
