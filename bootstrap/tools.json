@@ -1,0 +1,74 @@
+{
+  "required": [
+    {
+      "name": "claude",
+      "commands": ["claude"],
+      "purpose": "Claude Code CLI"
+    },
+    {
+      "name": "jq",
+      "commands": ["jq"],
+      "purpose": "Hook payload parsing and config inspection"
+    },
+    {
+      "name": "python3",
+      "commands": ["python3"],
+      "purpose": "Safe JSON merge and transcript parsing"
+    },
+    {
+      "name": "hash",
+      "commands_any": ["md5sum", "md5"],
+      "purpose": "Session reread sentinel keys"
+    }
+  ],
+  "recommended": [
+    {
+      "name": "rtk",
+      "commands": ["rtk"],
+      "minimum_version": "0.43.0",
+      "version_command": "rtk --version",
+      "install": {
+        "known_source": true,
+        "approval_required": true,
+        "command": "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh",
+        "url": "https://github.com/rtk-ai/rtk"
+      },
+      "purpose": "Filtered shell output and compact grep/read/git commands"
+    },
+    {
+      "name": "ccusage",
+      "commands": ["npx"],
+      "purpose": "Statusline and usage visibility"
+    },
+    {
+      "name": "caveman",
+      "commands_any": ["caveman"],
+      "install": {
+        "known_source": true,
+        "approval_required": true,
+        "command": "curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/src/tools/caveman-init.js | node -",
+        "url": "https://github.com/JuliusBrussee/caveman"
+      },
+      "purpose": "Compressed output mode"
+    }
+  ],
+  "managed_modes": [
+    {
+      "name": "ponytail",
+      "type": "instruction_skill",
+      "purpose": "Minimal code generation"
+    }
+  ],
+  "graph": {
+    "name": "codegraph",
+    "commands": ["codegraph_explore", "codegraph_node", "codegraph_search"],
+    "index_dir": ".codegraph",
+    "install": {
+      "known_source": false,
+      "approval_required": true,
+      "command": "",
+      "url": ""
+    },
+    "purpose": "Graph-first code discovery"
+  }
+}
