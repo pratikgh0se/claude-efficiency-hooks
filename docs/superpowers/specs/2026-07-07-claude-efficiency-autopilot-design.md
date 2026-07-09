@@ -15,8 +15,27 @@ Phase one focuses on existing tools working together: Claude Code hooks, Codex h
 - This laptop can be remediated safely with backups and idempotent config merges.
 - Claude and Codex prefer graph-first code discovery when a code graph exists.
 - Expensive command patterns are blocked or redirected before they pollute context.
+- Missing or outdated known tools are installed or upgraded after explicit approval.
+- Unknown-source tools fail with clear setup instructions instead of silent omission.
 - Token-saving behavior is mostly automatic, with manual approval only for installs, secrets, broad MCP changes, or risky global config edits.
 - Secrets and auth values from existing user config are never copied into the repo.
+
+## Source Guidance
+
+The design incorporates the July 6, 2026 Confluence guide "How to Reduce Claude Code Cost":
+
+- Cost has two dimensions: model price per token and token count.
+- The top cost levers are right-sized model choice and context hygiene.
+- Input, output, and cache-read tokens behave differently; measure real sessions before claiming a fixed savings percentage.
+- Claude Code subscription users already get the 1-hour prompt-cache TTL inside included usage; the important behavior is avoiding cache-invalidating moves.
+- Set model and effort at session start. Do not switch `/model` or `/effort` mid-task unless the quality tradeoff is worth the cache reset.
+- Use `/clear` between unrelated tasks and `/compact` when switching context inside related work.
+- Trim `CLAUDE.md` and avoid loading unnecessary MCP schemas because these ride along every turn.
+- Use CodeGraph before grep/find/Read when `.codegraph/` exists.
+- Use RTK patterns for shell work: `rtk grep <pattern> -r`, `rtk read`, `rtk ls`, and `rtk git status/diff/log`.
+- Require `rtk >= 0.43.0`; earlier versions can silently drop `rtk grep` matches.
+- Use Caveman for compressed output and Ponytail for minimal code generation.
+- Measure with `rtk gain`, `rtk gain --history`, `rtk discover`, and `/usage`.
 
 ## Non-Goals
 
@@ -44,6 +63,13 @@ Add manifest files that describe what the efficiency stack expects:
 
 The manifest is the source of truth for `doctor.sh`, `install.sh`, and future Claude/Codex skills.
 
+Known install/remediation policies:
+
+- RTK: install or upgrade to `>= 0.43.0` after approval. The Confluence guide points to `https://github.com/rtk-ai/rtk` and the upstream installer command `curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh`.
+- Caveman: install or refresh after approval using the known Caveman source `https://github.com/JuliusBrussee/caveman` or the local Claude plugin cache when available.
+- Ponytail: install as local Claude/Codex instructions and skills. If a real Ponytail binary/source is later discovered, add it to the manifest.
+- CodeGraph: install only when `bootstrap/tools.json` contains an authoritative install source or a local command is already present. Otherwise doctor reports the missing source and marks full graph-first autopilot incomplete.
+
 ### 2. Doctor and Repair
 
 Add `doctor.sh` as a fast read-only audit:
@@ -62,6 +88,7 @@ Add repair modes to `install.sh`:
 
 - `--dry-run`: show planned changes
 - `--apply`: update current laptop
+- `--install-tools`: install or upgrade missing/outdated known tools after approval
 - `--portable`: print/setup new-laptop bootstrap path
 - `--init-repo PATH`: initialize graph/rules for a target repo
 
@@ -119,13 +146,14 @@ CodeGraph is first-class in phase one. The installer should:
 
 - detect graph tool commands
 - detect `.codegraph/`
+- install CodeGraph when an authoritative source is configured
 - initialize or refresh repo graph indexes when commands are available
 - add graph-first rules to Claude and Codex instructions
 - block broad code discovery patterns when graph is ready
 
 If the CodeGraph installer source is unknown, the system must fail clearly:
 
-> CodeGraph is required for full autopilot, but no install source is configured. Add the installer to `bootstrap/tools.json` or install CodeGraph manually, then rerun doctor.
+> CodeGraph is required for full graph-first autopilot, but no install source is configured. Add the installer to `bootstrap/tools.json` or install CodeGraph manually, then rerun doctor.
 
 This avoids pretending a guessed package is the real internal tool.
 
@@ -164,6 +192,7 @@ Autopilot should do the routine work:
 
 - install and merge rules
 - detect missing tools
+- install or upgrade known missing tools after approval
 - initialize graph indexes
 - block expensive command patterns
 - prefer graph/RTK routes
@@ -200,6 +229,7 @@ Manual verification should include:
 
 - `./doctor.sh`
 - `./install.sh --dry-run`
+- `./install.sh --install-tools --dry-run`
 - hook scripts with sample Claude payloads
 - Codex hook shape validation against documented `hooks.json` structure
 - no secrets copied into repo files
@@ -207,14 +237,16 @@ Manual verification should include:
 ## Rollout Plan
 
 1. Add manifests, shared helpers, and doctor.
-2. Upgrade hooks and add tests.
-3. Add Claude/Codex instruction blocks and skills.
-4. Replace installer with idempotent dry-run/apply/portable/init-repo modes.
-5. Run local verification.
-6. Apply to current laptop only after approval for writes outside the repo.
+2. Add known-tool install/upgrade handling for RTK, Caveman, Ponytail instructions, and source-configured CodeGraph.
+3. Upgrade hooks and add tests.
+4. Add Claude/Codex instruction blocks and skills.
+5. Replace installer with idempotent dry-run/apply/install-tools/portable/init-repo modes.
+6. Run local verification.
+7. Apply to current laptop only after approval for writes outside the repo.
 
 ## Phase-One Decisions
 
+- Tool installation: install or upgrade known-source tools after explicit approval. RTK and Caveman have known sources. Ponytail is local instruction/skill setup unless a real source appears. CodeGraph requires a configured authoritative source.
 - CodeGraph install source: implement the manifest slot, detection, graph-first rules, and repo initialization. Do not invent an installer. If no authoritative source is configured, doctor fails loudly with the action needed.
 - MCP cleanup: phase one reports inactive, failed, and high-count MCP surfaces, but does not disable them automatically. An explicit cleanup mode can be added after the user reviews doctor output.
 - Graph initialization: `install.sh --init-repo PATH` is the deterministic path. Session-start hooks may detect missing graph state and recommend initialization, but they must not run heavy indexing implicitly unless a future config flag opts in.
