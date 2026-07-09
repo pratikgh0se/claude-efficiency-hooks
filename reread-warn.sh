@@ -1,47 +1,66 @@
 #!/usr/bin/env bash
 # PreToolUse hook for Read tool.
-# Tracks files read per session. Warns Claude when re-reading a file it already has in context.
-# Uses /tmp sentinel files keyed by session_id + file_path hash.
+# Tracks files read per session and blocks repeated full rereads.
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/lib/efficiency-common.sh" ]; then
+  # shellcheck source=lib/efficiency-common.sh
+  . "$SCRIPT_DIR/lib/efficiency-common.sh"
+fi
+
 INPUT=$(cat)
 
-TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || echo "")
+TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || echo "")
 [ "$TOOL" != "Read" ] && exit 0
 
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || echo "")
-[ -z "$FILE_PATH" ] || [ -z "$SESSION_ID" ] && exit 0
+SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
+FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || echo "")
+if [ -z "$FILE_PATH" ] || [ -z "$SESSION_ID" ]; then
+  exit 0
+fi
 
-# Expand ~
 FILE_PATH="${FILE_PATH/#\~/$HOME}"
 
-# Hash the file path to a short key
-FILE_HASH=$(echo "$FILE_PATH" | md5sum | cut -c1-12)
-SENTINEL_DIR="/tmp/reread-track-${SESSION_ID}"
+hash_key() {
+  if command -v md5sum >/dev/null 2>&1; then
+    printf '%s' "$1" | md5sum | awk '{print substr($1, 1, 12)}'
+  elif command -v md5 >/dev/null 2>&1; then
+    printf '%s' "$1" | md5 -q | cut -c1-12
+  else
+    printf '%s' "$1" | cksum | awk '{print $1}'
+  fi
+}
+
+FILE_HASH="$(hash_key "$FILE_PATH")"
+SENTINEL_DIR="${TMPDIR:-/tmp}/reread-track-${SESSION_ID}"
 mkdir -p "$SENTINEL_DIR"
 SENTINEL="${SENTINEL_DIR}/${FILE_HASH}"
 
-FILENAME=$(basename "$FILE_PATH")
-
+FILENAME="$(basename "$FILE_PATH")"
+COUNT=0
 if [ -f "$SENTINEL" ]; then
-  COUNT=$(cat "$SENTINEL")
-  COUNT=$((COUNT + 1))
-  echo "$COUNT" > "$SENTINEL"
+  COUNT="$(sed -n '1p' "$SENTINEL" 2>/dev/null || printf '0')"
+fi
+case "$COUNT" in
+  ''|*[!0-9]*) COUNT=0 ;;
+esac
+COUNT=$((COUNT + 1))
+printf '%s\n' "$COUNT" > "$SENTINEL"
 
-  # Only warn starting from 2nd re-read (3rd total read)
-  if [ "$COUNT" -ge 2 ]; then
-    cat << EOF
-{
-  "decision": "block",
-  "reason": "TOKEN EFFICIENCY: You are re-reading '${FILENAME}' for the $((COUNT + 1))th time this session. The file content is already in your context window — re-reading it wastes input tokens and inflates context size. Instead: reference the content you already read, use grep/Bash to extract specific values, or search your earlier tool results. Only re-read if you need a section you explicitly did NOT read before (specify the line range)."
-}
-EOF
-    exit 0
+if [ "$COUNT" -ge 3 ]; then
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  if [ -d "$REPO_ROOT/.codegraph" ]; then
+    NEXT="Use codegraph_explore \"where is ${FILENAME} used?\" or codegraph_node file=\"${FILE_PATH}\" before rereading."
+  elif command -v rtk >/dev/null 2>&1; then
+    NEXT="Use rtk grep <specific term> -r or read an exact line range instead."
+  else
+    NEXT="Use grep/rg for a specific value or read an exact line range instead."
   fi
-else
-  echo "1" > "$SENTINEL"
+  jq -n --arg reason "TOKEN EFFICIENCY: You are re-reading '${FILENAME}' for the ${COUNT}th time this session. The file content is already in context. ${NEXT}" \
+    '{decision:"block", reason:$reason}'
+  exit 0
 fi
 
 exit 0
