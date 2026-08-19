@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - add efficiency manifest helpers
 
 ### Changed
+- docs: record worktree ignore
+- chore: ignore local worktrees
 - docs: document efficiency autopilot
 - docs: expand efficiency spec
 - docs: add efficiency autopilot spec, including Confluence cost guidance and tool install policy
