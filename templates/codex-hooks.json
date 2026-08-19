@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/bash-cat-block.sh\"",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/claude-efficiency-hooks/bash-cat-block.sh\"",
             "timeout": 30,
             "statusMessage": "Checking shell output size"
           }
@@ -17,9 +17,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/graph-first-block.sh\"",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/claude-efficiency-hooks/graph-first-block.sh\"",
             "timeout": 30,
             "statusMessage": "Checking graph-first policy"
+          }
+        ]
+      },
+      {
+        "matcher": "^Read$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/claude-efficiency-hooks/reread-warn.sh\"",
+            "timeout": 30,
+            "statusMessage": "Checking repeated reads"
           }
         ]
       }
@@ -29,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/context-monitor-stop.sh\"",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/claude-efficiency-hooks/context-monitor-stop.sh\"",
             "timeout": 30,
             "statusMessage": "Checking context size"
           }

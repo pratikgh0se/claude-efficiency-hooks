@@ -166,14 +166,15 @@ merge_claude_settings() {
 import json
 import os
 import sys
+import tempfile
 
 path = sys.argv[1]
 if os.path.exists(path):
     with open(path) as f:
         try:
             data = json.load(f)
-        except json.JSONDecodeError:
-            data = {}
+        except json.JSONDecodeError as error:
+            raise SystemExit(f"Refusing to replace invalid JSON in {path}: {error}")
 else:
     data = {}
 
@@ -204,9 +205,18 @@ add("PreToolUse", "Glob", f"{home}/.claude/hooks/graph-first-block.sh")
 add("PreToolUse", "Read", f"{home}/.claude/hooks/graph-first-block.sh")
 
 os.makedirs(os.path.dirname(path), exist_ok=True)
-with open(path, "w") as f:
-    json.dump(data, f, indent=2)
-    f.write("\n")
+fd, tmp_path = tempfile.mkstemp(
+    dir=os.path.dirname(path), prefix=".claude-efficiency-hooks-", suffix=".tmp"
+)
+try:
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp_path, path)
+except BaseException:
+    if os.path.exists(tmp_path):
+        os.unlink(tmp_path)
+    raise
 PY
 }
 
@@ -226,15 +236,90 @@ install_global() {
   merge_claude_settings
 }
 
-write_codex_hooks() {
+merge_codex_hooks() {
   local target_repo="$1"
   local target="$target_repo/.codex/hooks.json"
-  planned "write $target"
+  planned "merge claude-efficiency-hooks hooks into $target"
   ensure_parent "$target"
   backup_file "$target"
   if [ "$DRY_RUN" = "false" ]; then
-    cp "$SCRIPT_DIR/templates/codex-hooks.json" "$target"
+    python3 - "$target" "$SCRIPT_DIR/templates/codex-hooks.json" <<'PY'
+import copy
+import json
+import os
+import sys
+import tempfile
+
+path, template_path = sys.argv[1:3]
+
+if os.path.exists(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"Refusing to replace invalid JSON in {path}: {error}")
+else:
+    data = {}
+
+with open(template_path) as f:
+    template = json.load(f)
+
+if not isinstance(data, dict):
+    raise SystemExit(f"Refusing to merge non-object JSON in {path}")
+if not isinstance(template, dict) or not isinstance(template.get("hooks"), dict):
+    raise SystemExit(f"Invalid Codex hook template: {template_path}")
+
+hooks = data.setdefault("hooks", {})
+if not isinstance(hooks, dict):
+    raise SystemExit(f"Refusing to merge non-object hooks in {path}")
+
+for event, template_entries in template["hooks"].items():
+    entries = hooks.setdefault(event, [])
+    if not isinstance(entries, list):
+        raise SystemExit(f"Refusing to merge non-list {event} hooks in {path}")
+    for template_entry in template_entries:
+        matcher = template_entry.get("matcher")
+        existing = next((entry for entry in entries if entry.get("matcher") == matcher), None)
+        if existing is None:
+            entries.append(copy.deepcopy(template_entry))
+            continue
+        existing_hooks = existing.setdefault("hooks", [])
+        if not isinstance(existing_hooks, list):
+            raise SystemExit(f"Refusing to merge malformed {event} hook entry in {path}")
+        for hook in template_entry.get("hooks", []):
+            if not any(current.get("command") == hook.get("command") for current in existing_hooks if isinstance(current, dict)):
+                existing_hooks.append(copy.deepcopy(hook))
+
+fd, tmp_path = tempfile.mkstemp(
+    dir=os.path.dirname(path), prefix=".claude-efficiency-hooks-", suffix=".tmp"
+)
+try:
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp_path, path)
+except BaseException:
+    if os.path.exists(tmp_path):
+        os.unlink(tmp_path)
+    raise
+PY
   fi
+}
+
+install_codex_helper_bundle() {
+  local target_repo="$1"
+  local target_dir="$target_repo/.codex/claude-efficiency-hooks"
+  local helper
+  for helper in bash-cat-block.sh graph-first-block.sh reread-warn.sh context-monitor-stop.sh; do
+    copy_file "$SCRIPT_DIR/$helper" "$target_dir/$helper"
+  done
+  copy_file "$SCRIPT_DIR/lib/efficiency-common.sh" "$target_dir/lib/efficiency-common.sh"
+}
+
+write_codex_hooks() {
+  local target_repo="$1"
+  merge_codex_hooks "$target_repo"
+  install_codex_helper_bundle "$target_repo"
 }
 
 init_repo() {

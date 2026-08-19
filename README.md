@@ -69,7 +69,7 @@ For a printable version:
 - Caveman uses the known upstream init command and remains approval-gated.
 - Ponytail is installed as local Claude/Codex skills and durable instructions.
 - CodeGraph is enforced when `.codegraph/` exists, but installation is disabled until `bootstrap/tools.json` contains a real trusted source.
-- MCP cleanup is report-only; this repo does not disable servers automatically.
+- MCP cleanup is report-only; this repo does not disable servers automatically. Doctor warns when the combined inventory reaches the advisory budget of 20 servers; set `CEH_MCP_WARN_THRESHOLD` to tune that warning.
 
 ## Hooks
 
@@ -80,6 +80,15 @@ For a printable version:
 `graph-first-block.sh` blocks broad `Grep`, `Glob`, and exploratory full-file `Read` when a `.codegraph/` index is present.
 
 `context-monitor-stop.sh` warns at 80k context tokens and urgent-blocks at 120k, with cache guidance to keep model/effort stable and compact related work before continuing.
+
+## Current Token-Saving Methods
+
+- Keep durable instructions and tool descriptions concise; state a policy once rather than repeating it.
+- Enable only task-relevant MCP servers and tools. Their schemas are recurring context, so a large catalog can cost more than the task itself.
+- Keep model, reasoning effort, system instructions, and toolsets stable during related work to preserve cache locality. Start a new session for unrelated work.
+- Start with the lowest reasoning effort that satisfies the task, then compare one level higher only when a representative evaluation shows a quality gain.
+- For API-backed workflows, cache stable prompt prefixes and process large, predictable tool outputs in code before returning a small result to the model.
+- Measure task success, tokens, cache reads/writes, latency, and cost together. A lower-token run is useful only when it still meets the acceptance criteria.
 
 ## Safety
 

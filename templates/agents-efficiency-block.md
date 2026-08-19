@@ -6,3 +6,6 @@
 - Use RTK commands for shell output when available: `rtk grep <pattern> -r`, `rtk read`, `rtk ls`, and `rtk git status/diff/log`.
 - Use Ponytail mode by default: smallest working change, reuse existing code, no speculative abstractions.
 - Keep durable instructions concise because they consume context every turn.
+- Keep only task-relevant MCP servers and tools enabled; their schemas consume context on every turn.
+- Preserve stable model, toolset, and instruction prefixes during related work to improve cache reuse.
+- Start at the lowest reasoning effort that meets the task; use higher effort only after measured verification.

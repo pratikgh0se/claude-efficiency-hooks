@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/efficiency-common.sh
+. "$SCRIPT_DIR/lib/efficiency-common.sh"
+
 INPUT=$(cat)
 
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || echo "")
@@ -12,7 +16,7 @@ case "$TOOL" in
 esac
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-[ -d "$REPO_ROOT/.codegraph" ] || exit 0
+[ -d "$REPO_ROOT/.codegraph" ] && ceh_has_codegraph_tools || exit 0
 
 emit_block() {
   local reason="$1"

@@ -17,6 +17,13 @@ run_hook() {
   printf '%s' "$payload" | bash "$ROOT/$hook"
 }
 
+run_hook_with_path() {
+  local hook="$1"
+  local payload="$2"
+  local bin_dir="$3"
+  printf '%s' "$payload" | PATH="$bin_dir:$PATH" bash "$ROOT/$hook"
+}
+
 OUT="$(run_hook bash-cat-block.sh '{"tool_name":"Bash","tool_input":{"command":"cat README.md"}}')"
 printf '%s' "$OUT" | jq -e '.decision == "block"' >/dev/null || fail "cat should block"
 printf '%s' "$OUT" | jq -e '.reason | contains("rtk read") or contains("Read tool")' >/dev/null || fail "cat reason should name cheaper read path"
@@ -32,7 +39,15 @@ OUT="$(run_hook bash-cat-block.sh '{"tool_name":"Bash","tool_input":{"command":"
 
 mkdir -p "$TMP_DIR/repo/.codegraph"
 OUT="$(cd "$TMP_DIR/repo" && run_hook graph-first-block.sh '{"tool_name":"Grep","tool_input":{"pattern":"AuthService","path":"."}}')"
-printf '%s' "$OUT" | jq -e '.decision == "block"' >/dev/null || fail "Grep should block when graph index exists"
+[ -z "$OUT" ] || fail "stale CodeGraph index should not block discovery"
+
+mkdir -p "$TMP_DIR/bin"
+for command in codegraph_explore codegraph_node codegraph_search; do
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP_DIR/bin/$command"
+  chmod +x "$TMP_DIR/bin/$command"
+done
+OUT="$(cd "$TMP_DIR/repo" && run_hook_with_path graph-first-block.sh '{"tool_name":"Grep","tool_input":{"pattern":"AuthService","path":"."}}' "$TMP_DIR/bin")"
+printf '%s' "$OUT" | jq -e '.decision == "block"' >/dev/null || fail "Grep should block when CodeGraph is usable"
 
 OUT="$(run_hook reread-warn.sh '{"tool_name":"Read","session_id":"s1","tool_input":{"file_path":"README.md"}}')"
 [ -z "$OUT" ] || fail "first read should pass"

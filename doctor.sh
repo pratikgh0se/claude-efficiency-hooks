@@ -215,15 +215,23 @@ count_codex_mcp() {
 }
 
 check_mcp() {
-  local claude_count codex_count
+  local claude_count codex_count total_count budget
   claude_count="$(count_claude_mcp)"
   codex_count="$(count_codex_mcp)"
+  budget="${CEH_MCP_WARN_THRESHOLD:-20}"
+  case "$budget" in
+    ''|*[!0-9]*) budget=20 ;;
+  esac
+  total_count=$((claude_count + codex_count))
   if [ "$NO_MCP_HEALTH" = "true" ]; then
     record "MCP" "INFO" "MCP health" "network/process health skipped"
   else
     record "MCP" "INFO" "MCP health" "read-only count only; no server health checks performed"
   fi
   record "MCP" "INFO" "MCP servers" "Claude=${claude_count}, Codex=${codex_count}"
+  if [ "$total_count" -ge "$budget" ]; then
+    record "MCP" "WARN" "MCP budget" "${total_count} enabled servers meet the advisory budget of ${budget}; enable only task-relevant toolsets to reduce per-turn schema context"
+  fi
 }
 
 print_text() {
