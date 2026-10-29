@@ -1,8 +1,8 @@
 # claude-efficiency-hooks
 
-Portable Claude/Codex token-efficiency autopilot: hooks, durable instructions, skills, tool audits, and repo initialization for lower-noise agent work.
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-The goal is simple: keep your normal `claude` and `codex` habits, while this repo quietly steers agents toward graph-first discovery, compact shell output, fewer rereads, and safer context management.
+**Claude Code and Codex hooks that cut token waste: they block rereads and noisy shell output, watch context size and steer agents to graph-first code search.** Keep your normal `claude` and `codex` habits. `doctor.sh` audits your setup without writing anything, and the installer previews its changes first.
 
 ## What It Installs
 
